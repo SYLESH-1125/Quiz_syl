@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,20 +34,26 @@ import {
   CheckCircle,
   AlertCircle,
 } from "lucide-react"
-import { useSession, signOut } from "next-auth/react"
+import { useAuth } from "@/contexts/auth-context"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+
+
+type QuestionType = "multiple-choice" | "true-false" | "short-answer" | "fill-in-the-blanks";
+
+// Removed MatchPair interface (no longer needed)
+
 interface Question {
-  id: string
-  type: "multiple-choice" | "true-false" | "short-answer"
-  question: string
-  options?: string[]
-  correctAnswer: string | number
-  points: number
+  id: string;
+  type: QuestionType;
+  question: string;
+  options?: string[];
+  correctAnswer: string | number | number[];
+  points: number;
 }
 
 export default function CreateQuizPage() {
-  const { data: session, status } = useSession()
+  const { user, loading, signOut } = useAuth();
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -58,19 +66,82 @@ export default function CreateQuizPage() {
   const [quizSubject, setQuizSubject] = useState("")
   const [timeLimit, setTimeLimit] = useState("30")
   const [questions, setQuestions] = useState<Question[]>([])
+  const [keywords, setKeywords] = useState("")
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // AI Question Generation
+  const generateQuestionsWithAI = async () => {
+    if (!keywords.trim()) {
+      setError("Please enter syllabus keywords for AI generation.")
+      return
+    }
+    setIsGenerating(true)
+    setError("")
+    try {
+      const res = await fetch("/api/quiz/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywords, numQuestions: 5 })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to generate questions.")
+      // Map AI questions to local Question type
+      const aiQuestions = (data.questions || []).map((q: any, idx: number) => {
+        if (q.type === "mcq" || q.type === "multiple-choice") {
+          return {
+            id: Math.random().toString(36).substring(2, 15),
+            type: "multiple-choice",
+            question: q.question,
+            options: q.options,
+            correctAnswer: typeof q.correctAnswer === "number" ? q.correctAnswer : (q.options || []).findIndex((o: string) => o === q.correctAnswer),
+            points: 1,
+          }
+        } else if (q.type === "true-false" || q.type === "true_false") {
+          // Normalize correctAnswer to "true" or "false"
+          let answer = q.correctAnswer;
+          if (typeof answer === "boolean") answer = answer ? "true" : "false";
+          if (typeof answer === "string") answer = answer.trim().toLowerCase();
+          return {
+            id: Math.random().toString(36).substring(2, 15),
+            type: "true-false",
+            question: q.question,
+            options: ["True", "False"],
+            correctAnswer: answer,
+            points: 1,
+          }
+        } else if (q.type === "fill-in-the-blanks" || q.type === "fill_in_the_blanks") {
+          return {
+            id: Math.random().toString(36).substring(2, 15),
+            type: "fill-in-the-blanks",
+            question: q.question,
+            options: [],
+            correctAnswer: q.correctAnswer,
+            points: 1,
+          }
+        }
+        return null
+      }).filter(Boolean)
+      setQuestions(aiQuestions)
+      toast({ title: "AI Questions Generated!", description: "You can review and edit them before saving." })
+    } catch (err: any) {
+      setError(err.message || "Failed to generate questions.")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   useEffect(() => {
-    if (status === "loading") return
-    if (!session) {
+    if (loading) return
+    if (!user) {
       router.push("/login")
       return
     }
-    // If you want to check for user type, you can do so here if you store it in the session
     setIsLoading(false)
-  }, [session, status, router])
+  }, [user, loading, router])
 
-  const handleLogout = () => {
-    signOut({ callbackUrl: "/login" })
+  const handleLogout = async () => {
+    await signOut()
+    router.push("/login")
   }
 
   // Generate user initials for avatar fallback
@@ -95,6 +166,18 @@ export default function CreateQuizPage() {
     setQuestions([...questions, newQuestion])
   }
 
+  const addFillBlankQuestion = () => {
+    const newQuestion: Question = {
+      id: Math.random().toString(36).substring(2, 15),
+      type: "fill-in-the-blanks",
+      question: "",
+      options: [],
+      correctAnswer: "",
+      points: 1,
+    }
+    setQuestions([...questions, newQuestion])
+  }
+
   const updateQuestion = (id: string, updates: Partial<Question>) => {
     setQuestions(questions.map((q) => (q.id === id ? { ...q, ...updates } : q)))
   }
@@ -107,12 +190,16 @@ export default function CreateQuizPage() {
     setQuestions(
       questions.map((q) => {
         if (q.id === questionId && q.options) {
-          const newOptions = [...q.options]
-          newOptions[optionIndex] = value
-          return { ...q, options: newOptions }
+          // If options is string[], update as string[]
+          if (Array.isArray(q.options) && typeof q.options[0] === "string") {
+            const newOptions = [...(q.options as string[])]
+            newOptions[optionIndex] = value
+            return { ...q, options: newOptions }
+          }
+          // If options is MatchPair[], do not update here (handled elsewhere)
         }
         return q
-      }),
+      })
     )
   }
 
@@ -144,7 +231,7 @@ export default function CreateQuizPage() {
       }
 
       if (question.type === "multiple-choice" && question.options) {
-        const filledOptions = question.options.filter((opt) => opt.trim())
+        const filledOptions = question.options.filter((opt) => typeof opt === "string" && opt.trim())
         if (filledOptions.length < 2) {
           setError("Multiple choice questions must have at least 2 options")
           return
@@ -161,39 +248,34 @@ export default function CreateQuizPage() {
       title: quizTitle.trim(),
       description: quizDescription.trim(),
       subject: quizSubject,
-      timeLimit: Number.parseInt(timeLimit),
+      timelimit: Number.parseInt(timeLimit),
       questions,
-      createdBy: session?.user?.id,
-      createdAt: new Date().toISOString(),
+      createdby: user?.id,
+      createdat: new Date().toISOString(),
       status: "active",
-      totalPoints: questions.reduce((sum, q) => sum + q.points, 0),
+      totalpoints: questions.reduce((sum, q) => sum + q.points, 0), // changed to match DB column
     }
 
-    // Save to localStorage
-    const existingQuizzes = JSON.parse(localStorage.getItem("faculty_quizzes") || "[]")
-    existingQuizzes.push(quiz)
-    localStorage.setItem("faculty_quizzes", JSON.stringify(existingQuizzes))
-
-    // Update faculty data
-    const userDataKey = `faculty_data_${session?.user?.id}`
-    const existingData = JSON.parse(localStorage.getItem(userDataKey) || "{}")
-    const updatedData = {
-      ...existingData,
-      stats: {
-        ...existingData.stats,
-        totalQuizzes: (existingData.stats?.totalQuizzes || 0) + 1,
-        activeQuizzes: (existingData.stats?.activeQuizzes || 0) + 1,
-      },
+    // Save to Supabase
+    try {
+      const { data, error: dbError } = await supabase
+        .from("quizzes")
+        .insert([quiz])
+        .select()
+      if (dbError) {
+        setError("Failed to save quiz: " + dbError.message)
+        setIsSaving(false)
+        return
+      }
+      setIsSaving(false)
+      setShowSuccess(true)
+      setTimeout(() => {
+        router.push("/faculty/dashboard")
+      }, 2000)
+    } catch (err: any) {
+      setError("Failed to save quiz: " + (err.message || "Unknown error"))
+      setIsSaving(false)
     }
-    localStorage.setItem(userDataKey, JSON.stringify(updatedData))
-
-    setIsSaving(false)
-    setShowSuccess(true)
-
-    // Redirect after showing success
-    setTimeout(() => {
-      router.push("/faculty/dashboard")
-    }, 2000)
   }
 
   // Show loading state while checking authentication
@@ -209,7 +291,7 @@ export default function CreateQuizPage() {
   }
 
   // Don't render if no user (will redirect)
-  if (!session) {
+  if (!user) {
     return null
   }
 
@@ -245,16 +327,16 @@ export default function CreateQuizPage() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={session.user?.image || "/placeholder.png"} alt={session.user?.name} />
-                      <AvatarFallback>{getUserInitials(session.user?.name || "")}</AvatarFallback>
+                      <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.png"} alt={user.user_metadata?.full_name || user.email || "User"} />
+                      <AvatarFallback>{getUserInitials(user.user_metadata?.full_name || user.email || "")}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{session.user?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{session.user?.email}</p>
+                      <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || user.email}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -280,22 +362,22 @@ export default function CreateQuizPage() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {showSuccess && (
-          <Alert className="mb-6 border-green-200 bg-green-50">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
-              Quiz created successfully! Redirecting to dashboard...
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {error && (
-          <Alert className="mb-6 border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
-          </Alert>
-        )}
-
+        <>
+          {showSuccess && (
+            <Alert className="mb-6 border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                Quiz created successfully! Redirecting to dashboard...
+              </AlertDescription>
+            </Alert>
+          )}
+          {error && (
+            <Alert className="mb-6 border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">{error}</AlertDescription>
+            </Alert>
+          )}
+        </>
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Create New Quiz</h1>
           <p className="text-gray-600 mt-2">Design and configure your quiz for students</p>
@@ -367,6 +449,42 @@ export default function CreateQuizPage() {
                     <SelectItem value="120">2 hours</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Keywords & Generate Button */}
+          <Card>
+            <CardHeader>
+              <CardTitle>AI Quiz Generation</CardTitle>
+              <CardDescription>Let AI generate questions based on your syllabus keywords</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="keywords">Syllabus Keywords *</Label>
+                  <Input
+                    id="keywords"
+                    placeholder="e.g. Photosynthesis, Chlorophyll, Light Reaction"
+                    value={keywords}
+                    onChange={e => setKeywords(e.target.value)}
+                    disabled={isSaving || isGenerating}
+                  />
+                </div>
+                <Button
+                  onClick={generateQuestionsWithAI}
+                  disabled={isSaving || isGenerating || !keywords.trim()}
+                  className="bg-purple-600 hover:bg-purple-700 min-w-[180px]"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>Generate Questions with AI</>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -467,7 +585,10 @@ interface QuestionEditorProps {
   disabled: boolean
 }
 
+
 function QuestionEditor({ question, index, onUpdate, onRemove, onUpdateOption, disabled }: QuestionEditorProps) {
+  // ...existing code...
+
   return (
     <Card className="border-l-4 border-l-purple-500">
       <CardHeader className="pb-4">
@@ -484,9 +605,10 @@ function QuestionEditor({ question, index, onUpdate, onRemove, onUpdateOption, d
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
-                  <SelectItem value="true-false">True/False</SelectItem>
-                  <SelectItem value="short-answer">Short Answer</SelectItem>
+                <SelectItem value="multiple-choice">Multiple Choice</SelectItem>
+                <SelectItem value="true-false">True/False</SelectItem>
+                <SelectItem value="fill-in-the-blanks">Fill in the Blanks</SelectItem>
+                <SelectItem value="short-answer">Short Answer</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex items-center space-x-2">
@@ -540,7 +662,7 @@ function QuestionEditor({ question, index, onUpdate, onRemove, onUpdateOption, d
                 />
                 <Input
                   placeholder={`Option ${optionIndex + 1}`}
-                  value={option}
+                  value={typeof option === "string" ? option : ""}
                   onChange={(e) => onUpdateOption(optionIndex, e.target.value)}
                   className="flex-1"
                   disabled={disabled}
@@ -580,6 +702,8 @@ function QuestionEditor({ question, index, onUpdate, onRemove, onUpdateOption, d
             </div>
           </div>
         )}
+        // ...existing code...
+       
 
         {question.type === "short-answer" && (
           <div className="space-y-3">
@@ -594,6 +718,27 @@ function QuestionEditor({ question, index, onUpdate, onRemove, onUpdateOption, d
               disabled={disabled}
             />
             <p className="text-xs text-gray-500">This will be used for automatic grading (case-insensitive)</p>
+          </div>
+        )}
+
+        {/* Fill in the Blanks UI - only one question textarea and one answer input */}
+        {question.type === "fill-in-the-blanks" && (
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Fill in the Blanks</Label>
+            <Textarea
+              placeholder="Enter the question with blanks (use ___ for blank)"
+              value={question.question}
+              onChange={e => onUpdate({ question: e.target.value })}
+              disabled={disabled}
+            />
+            <Label className="text-sm font-medium">Correct Answer</Label>
+            <Input
+              placeholder="Enter the correct answer for the blank"
+              value={question.correctAnswer as string}
+              onChange={e => onUpdate({ correctAnswer: e.target.value })}
+              disabled={disabled}
+            />
+            <p className="text-xs text-gray-500">Use ___ in your question where the blank should appear. Enter the correct answer above.</p>
           </div>
         )}
       </CardContent>

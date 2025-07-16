@@ -82,8 +82,8 @@ export default function StudentDashboard() {
   const [quizResults, setQuizResults] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
   const [studentProfile, setStudentProfile] = useState(null);
-  const [classmates, setClassmates] = useState([]);
-  const [leaderboard, setLeaderboard] = useState([]);
+  const [classmates, setClassmates] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState({ averageScore: 0, totalQuizzes: 0, completed: 0 });
 
   useEffect(() => {
@@ -106,6 +106,7 @@ export default function StudentDashboard() {
     if (user) fetchProfile();
   }, [user]);
 
+
   useEffect(() => {
     const fetchQuizResults = async () => {
       setLoadingData(true);
@@ -119,7 +120,68 @@ export default function StudentDashboard() {
       setLoadingData(false);
     };
     if (user) fetchQuizResults();
-  }, [user]);
+
+    // Real-time subscription for quiz_results
+    let subscription: any = null;
+    // Helper functions to refetch all student views
+    const refetchAllStudentViews = async () => {
+      await fetchQuizResults();
+      // Refetch analytics
+      if (user) {
+        const { data } = await supabase
+          .from('quiz_results')
+          .select('*')
+          .eq('student_id', user.id);
+        if (data) {
+          const completed = data.filter(q => q.status === 'completed').length;
+          const averageScore = data.length > 0
+            ? Math.round(data.filter(q => q.score !== null).reduce((sum, q) => sum + (q.score || 0), 0) / data.filter(q => q.score !== null).length)
+            : 0;
+          setAnalytics({ averageScore, totalQuizzes: data.length, completed });
+        }
+      }
+      // Refetch classmates and leaderboard
+      if (studentProfile) {
+        const { data: classmatesData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('department', studentProfile.department)
+          .eq('section', studentProfile.section);
+        setClassmates(classmatesData || []);
+        const { data: leaderboardData } = await supabase
+          .from('students')
+          .select('*')
+          .eq('department', studentProfile.department)
+          .eq('section', studentProfile.section)
+          .order('score', { ascending: false });
+        setLeaderboard(leaderboardData || []);
+      }
+    };
+
+    if (user) {
+      subscription = supabase
+        .channel('student-quiz-results')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'quiz_results',
+            filter: `student_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // Refetch all student views on any insert/update/delete for this student
+            refetchAllStudentViews();
+          }
+        )
+        .subscribe();
+    }
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, [user, studentProfile]);
 
   useEffect(() => {
     const fetchClassmatesAndLeaderboard = async () => {

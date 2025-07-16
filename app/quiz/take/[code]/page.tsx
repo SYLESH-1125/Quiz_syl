@@ -1,4 +1,4 @@
-image.png"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,17 +8,19 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 import { Clock, CheckCircle, AlertCircle, BookOpen } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/auth-context";
 
 interface Question {
-  id: number
-  question: string
-  options: string[]
-  correctAnswer: number
-  type: "multiple-choice" | "true-false"
+  id: string;
+  type: "multiple-choice" | "true-false" | "short-answer" | "fill-in-the-blanks";
+  question: string;
+  options?: string[];
+  correctAnswer: string | number;
+  points: number;
 }
 
 interface Quiz {
@@ -35,10 +37,12 @@ export default function TakeQuizPage() {
   const { user, loading } = useAuth();
   const [quiz, setQuiz] = useState<any>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<{ [key: number]: number }>({});
+  const [answers, setAnswers] = useState<{ [key: string]: string | number }>({});
   const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showResult, setShowResult] = useState(false);
+  const [resultData, setResultData] = useState<any>(null);
 
   const quizCode = params.code as string;
 
@@ -73,12 +77,12 @@ export default function TakeQuizPage() {
     }
   }, [timeLeft]);
 
-  const handleAnswerChange = (questionId: number, answerIndex: number) => {
+  const handleAnswerChange = (questionId: string, answer: string | number) => {
     setAnswers({
       ...answers,
-      [questionId]: answerIndex,
-    })
-  }
+      [questionId]: answer,
+    });
+  };
 
   const handleNext = () => {
     if (currentQuestion < (quiz?.questions.length || 0) - 1) {
@@ -93,49 +97,45 @@ export default function TakeQuizPage() {
   }
 
   const handleSubmit = async () => {
-    if (!quiz || !user) return
-
-    setIsSubmitting(true)
-
+    if (!quiz || !user) return;
+    setIsSubmitting(true);
     try {
-      // Calculate score
-      let correctAnswers = 0
-      quiz.questions.forEach((question) => {
-        if (answers[question.id] === question.correctAnswer) {
-          correctAnswers++
+      let correctAnswers = 0;
+      let totalPoints = 0;
+      let earnedPoints = 0;
+      quiz.questions.forEach((question: Question) => {
+        totalPoints += question.points;
+        const userAnswer = answers[question.id as string];
+        let isCorrect = false;
+        if (question.type === "multiple-choice" || question.type === "true-false") {
+          isCorrect = String(userAnswer).toLowerCase() === String(question.correctAnswer).toLowerCase();
+        } else if (question.type === "short-answer" || question.type === "fill-in-the-blanks") {
+          isCorrect = String(userAnswer).trim().toLowerCase() === String(question.correctAnswer).trim().toLowerCase();
         }
-      })
-
-      const score = Math.round((correctAnswers / quiz.questions.length) * 100)
-      const timeSpent = quiz.timeLimit - timeLeft
-
-      // Save result
+        if (isCorrect) {
+          correctAnswers++;
+          earnedPoints += question.points;
+        }
+      });
+      const score = earnedPoints;
+      const timeSpent = quiz.timelimit - timeLeft;
+      // Save result to Supabase
       const result = {
-        id: `result_${Date.now()}`,
-        studentId: user?.id,
-        studentName: user?.name,
-        studentEmail: user?.email,
-        quizTitle: quiz.title,
-        quizCode: quiz.code,
+        student_id: user.id,
+        quiz_code: quiz.code,
+        correctanswers: correctAnswers,
+        totalquestions: quiz.questions.length,
         score,
-        timeSpent,
-        submittedAt: new Date().toISOString(),
-        status: "completed",
+        timespent: timeSpent,
+        submittedat: new Date().toISOString(),
         answers,
-        correctAnswers,
-        totalQuestions: quiz.questions.length,
-      }
-
-      // Save to localStorage
-      const existingResults = JSON.parse(localStorage.getItem("quiz_results") || "[]")
-      existingResults.push(result)
-      localStorage.setItem("quiz_results", JSON.stringify(existingResults))
-
-      // Redirect to results page
-      router.push(`/quiz/result?id=${result.id}`)
+      };
+      await supabase.from("quiz_results").insert([result]);
+      setResultData({ correctAnswers, totalQuestions: quiz.questions.length, score });
+      setShowResult(true);
     } catch (error) {
-      setError("Failed to submit quiz. Please try again.")
-      setIsSubmitting(false)
+      setError("Failed to submit quiz. Please try again.");
+      setIsSubmitting(false);
     }
   }
 
@@ -188,6 +188,28 @@ export default function TakeQuizPage() {
   const currentQ = quiz.questions[currentQuestion]
   const progress = ((currentQuestion + 1) / quiz.questions.length) * 100
 
+  if (showResult && resultData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
+            <CardTitle className="text-green-900">Quiz Completed!</CardTitle>
+            <CardDescription>
+              You answered <span className="font-bold">{resultData.correctAnswers}</span> out of <span className="font-bold">{resultData.totalQuestions}</span> questions correctly.<br />
+              Your Score: <span className="font-bold">{resultData.score}</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => router.push("/student/dashboard")} className="w-full bg-purple-600 hover:bg-purple-700">
+              Go to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -230,26 +252,72 @@ export default function TakeQuizPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Question {currentQuestion + 1}</CardTitle>
-              <Badge variant={currentQ.type === "multiple-choice" ? "default" : "secondary"}>
-                {currentQ.type === "multiple-choice" ? "Multiple Choice" : "True/False"}
-              </Badge>
+              <Badge variant="default">{currentQ.type.replace(/-/g, " ")}</Badge>
             </div>
             <CardDescription className="text-base text-gray-900 mt-4">{currentQ.question}</CardDescription>
           </CardHeader>
           <CardContent>
-            <RadioGroup
-              value={answers[currentQ.id]?.toString()}
-              onValueChange={(value) => handleAnswerChange(currentQ.id, Number.parseInt(value))}
-            >
-              {currentQ.options.map((option, index) => (
-                <div key={index} className="flex items-center space-x-2 p-3 rounded-lg hover:bg-gray-50">
-                  <RadioGroupItem value={index.toString()} id={`option-${index}`} />
-                  <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
-                    {option}
-                  </Label>
+            {currentQ.type === "multiple-choice" && currentQ.options && (
+              <RadioGroup
+                value={answers[currentQ.id]?.toString()}
+                onValueChange={(value) => handleAnswerChange(currentQ.id, value)}
+              >
+                {currentQ.options.map((option: string, index: number) => (
+                  <div key={index} className="flex items-center space-x-2 p-3 rounded-lg hover:bg-gray-50">
+                    <RadioGroupItem value={option} id={`option-${index}`} />
+                    <Label htmlFor={`option-${index}`} className="flex-1 cursor-pointer">
+                      {option}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            )}
+            {currentQ.type === "true-false" && (
+              <RadioGroup
+                value={answers[currentQ.id]?.toString()}
+                onValueChange={(value) => handleAnswerChange(currentQ.id, value)}
+              >
+                <div className="flex items-center space-x-2 p-3 rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="true" id={`tf-true`} />
+                  <Label htmlFor={`tf-true`} className="flex-1 cursor-pointer">True</Label>
                 </div>
-              ))}
-            </RadioGroup>
+                <div className="flex items-center space-x-2 p-3 rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="false" id={`tf-false`} />
+                  <Label htmlFor={`tf-false`} className="flex-1 cursor-pointer">False</Label>
+                </div>
+              </RadioGroup>
+            )}
+            {currentQ.type === "short-answer" && (
+              <Input
+                placeholder="Type your answer"
+                value={answers[currentQ.id] || ""}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleAnswerChange(currentQ.id, e.target.value)}
+                className="mt-2"
+              />
+            )}
+            {currentQ.type === "fill-in-the-blanks" && (
+              <div className="mt-2">
+                {/* Render question with blank replaced by input */}
+                {(() => {
+                  // Replace ___ or {blank} in question text with input
+                  const BLANK_REGEX = /(___|\{blank\})/;
+                  const parts = currentQ.question.split(BLANK_REGEX);
+                  return parts.map((part: string, idx: number) =>
+                    BLANK_REGEX.test(part) ? (
+                      <Input
+                        key={"blank-" + idx}
+                        value={answers[currentQ.id] || ""}
+                        onChange={e => handleAnswerChange(currentQ.id, e.target.value)}
+                        className="inline-block w-32 mx-2"
+                        placeholder="Your answer"
+                      />
+                    ) : (
+                      <span key={"text-" + idx}>{part}</span>
+                    )
+                  );
+                })()}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -260,14 +328,14 @@ export default function TakeQuizPage() {
           </Button>
 
           <div className="flex space-x-2">
-            {quiz.questions.map((_, index) => (
+            {quiz.questions.map((_: any, index: number) => (
               <button
                 key={index}
                 onClick={() => setCurrentQuestion(index)}
                 className={`w-8 h-8 rounded-full text-sm font-medium transition-colors ${
                   index === currentQuestion
                     ? "bg-blue-600 text-white"
-                    : answers[quiz.questions[index].id] !== undefined
+                    : answers[quiz.questions[index].id as string] !== undefined
                       ? "bg-green-100 text-green-800"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
@@ -301,7 +369,9 @@ export default function TakeQuizPage() {
           <Alert className="mt-6">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              You have answered {Object.keys(answers).length} out of {quiz.questions.length} questions. Make sure to
+              You have answered {
+                quiz.questions.filter((q: Question) => answers[q.id] !== undefined && answers[q.id] !== "").length
+              } out of {quiz.questions.length} questions. Make sure to
               review your answers before submitting.
             </AlertDescription>
           </Alert>

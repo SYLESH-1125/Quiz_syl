@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -56,189 +56,137 @@ const facultyNavItems = [
   { key: "settings", title: "Settings", icon: Settings },
 ]
 
-// Sample data
-const sampleSections = [
-  {
-    id: "A",
-    name: "Section A",
-    students: 45,
-    improvement: "+8.4%",
-    avgScore: 87.3,
-    completionRate: 94,
-    engagement: 89,
-    strongAreas: ["Database Design", "Web Development"],
-    weakAreas: ["Algorithms", "Data Structures"],
-  },
-  {
-    id: "B",
-    name: "Section B",
-    students: 42,
-    improvement: "+12.1%",
-    avgScore: 83.7,
-    completionRate: 91,
-    engagement: 85,
-    strongAreas: ["Data Structures", "Database Design"],
-    weakAreas: ["Web Development", "Software Engineering"],
-  },
-  {
-    id: "C",
-    name: "Section C",
-    students: 38,
-    improvement: "+5.2%",
-    avgScore: 79.8,
-    completionRate: 88,
-    engagement: 82,
-    strongAreas: ["Algorithms", "Software Engineering"],
-    weakAreas: ["Database Design", "Web Development"],
-  },
-]
-
-const sampleStudents = [
-  {
-    id: 1,
-    name: "Arjun Patel",
-    section: "Section A",
-    department: "Computer Science",
-    year: "3rd Year",
-    avatar: "AP",
-    avgScore: 94.2,
-    completedQuizzes: 18,
-    streak: 12,
-    improvement: "+8.5%",
-    lastActive: "2 hours ago",
-    online: true,
-    badges: ["Top Performer", "Consistent"],
-    unitPerformance: [
-      { unit: "Data Structures", score: 94, completed: 8, total: 10 },
-      { unit: "Algorithms", score: 89, completed: 6, total: 8 },
-      { unit: "Database Design", score: 96, completed: 4, total: 4 },
-      { unit: "Web Development", score: 92, completed: 5, total: 6 },
-    ],
-    recentActivity: [
-      { quiz: "Binary Trees Quiz", date: "2025-01-12", score: 96, time: "18 min" },
-      { quiz: "SQL Joins Assessment", date: "2025-01-11", score: 94, time: "22 min" },
-      { quiz: "React Components Test", date: "2025-01-10", score: 88, time: "25 min" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Sneha Sharma",
-    section: "Section B",
-    department: "Computer Science",
-    year: "3rd Year",
-    avatar: "SS",
-    avgScore: 91.8,
-    completedQuizzes: 16,
-    streak: 8,
-    improvement: "+12.3%",
-    lastActive: "1 hour ago",
-    online: true,
-    badges: ["Rising Star", "Active"],
-    unitPerformance: [
-      { unit: "Data Structures", score: 92, completed: 7, total: 10 },
-      { unit: "Algorithms", score: 88, completed: 5, total: 8 },
-      { unit: "Database Design", score: 95, completed: 4, total: 4 },
-      { unit: "Web Development", score: 89, completed: 4, total: 6 },
-    ],
-    recentActivity: [
-      { quiz: "Hash Tables Quiz", date: "2025-01-12", score: 92, time: "20 min" },
-      { quiz: "Database Normalization", date: "2025-01-11", score: 95, time: "28 min" },
-      { quiz: "JavaScript Fundamentals", date: "2025-01-09", score: 87, time: "30 min" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Rohit Kumar",
-    section: "Section A",
-    department: "Computer Science",
-    year: "3rd Year",
-    avatar: "RK",
-    avgScore: 85.4,
-    completedQuizzes: 14,
-    streak: 5,
-    improvement: "+3.2%",
-    lastActive: "30 min ago",
-    online: false,
-    badges: ["Steady Progress"],
-    unitPerformance: [
-      { unit: "Data Structures", score: 87, completed: 6, total: 10 },
-      { unit: "Algorithms", score: 82, completed: 4, total: 8 },
-      { unit: "Database Design", score: 89, completed: 3, total: 4 },
-      { unit: "Web Development", score: 84, completed: 3, total: 6 },
-    ],
-    recentActivity: [
-      { quiz: "Sorting Algorithms", date: "2025-01-11", score: 85, time: "35 min" },
-      { quiz: "SQL Basics", date: "2025-01-10", score: 89, time: "25 min" },
-      { quiz: "HTML/CSS Quiz", date: "2025-01-09", score: 82, time: "28 min" },
-    ],
-  },
-]
-
-const sampleQuizzes = [
-  {
-    id: 1,
-    title: "Advanced Data Structures",
-    subject: "Computer Science",
-    difficulty: "Hard",
-    status: "active",
-    category: "Core",
-    tags: ["Trees", "Graphs", "Algorithms"],
-    studentsEnrolled: 45,
-    submissions: 38,
-    avgScore: 82.4,
-    questions: 15,
-    timeLimit: "45 min",
-    completionRate: 84,
-    lastActivity: "2 hours ago",
-  },
-  {
-    id: 2,
-    title: "Database Design Principles",
-    subject: "Database Systems",
-    difficulty: "Medium",
-    status: "active",
-    category: "Core",
-    tags: ["SQL", "Normalization", "ER Diagrams"],
-    studentsEnrolled: 42,
-    submissions: 40,
-    avgScore: 89.2,
-    questions: 12,
-    timeLimit: "30 min",
-    completionRate: 95,
-    lastActivity: "1 hour ago",
-  },
-  {
-    id: 3,
-    title: "React Component Lifecycle",
-    subject: "Web Development",
-    difficulty: "Medium",
-    status: "completed",
-    category: "Elective",
-    tags: ["React", "JavaScript", "Frontend"],
-    studentsEnrolled: 38,
-    submissions: 35,
-    avgScore: 76.8,
-    questions: 10,
-    timeLimit: "25 min",
-    completionRate: 92,
-    lastActivity: "1 day ago",
-  },
-]
-
-const recentActivities = [
-  { type: "submission", student: "Arjun Patel", quiz: "Binary Trees Quiz", score: 96, time: "2 min ago" },
-  { type: "achievement", student: "Sneha Sharma", achievement: "Perfect Score Streak", time: "5 min ago" },
-  { type: "question", student: "Rohit Kumar", question: "Clarification on heap sort", time: "8 min ago" },
-  { type: "submission", student: "Priya Singh", quiz: "SQL Joins Assessment", score: 88, time: "12 min ago" },
-  { type: "achievement", student: "Arjun Patel", achievement: "Quiz Master", time: "15 min ago" },
-]
-
 export default function FacultyDashboard() {
   const { user, loading, signOut } = useAuth();
   const [activeView, setActiveView] = useState("dashboard");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [analyticsFilter, setAnalyticsFilter] = useState("Section Level");
   const router = useRouter();
+  // Quizzes state (fetched from Supabase)
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [quizzesLoading, setQuizzesLoading] = useState(true);
+  const [quizResults, setQuizResults] = useState<any[]>([]);
+  const [resultsLoading, setResultsLoading] = useState(true);
+
+  // Fetch quizzes from Supabase when user is loaded
+  useEffect(() => {
+    async function fetchQuizzes() {
+      if (!user) return;
+      setQuizzesLoading(true);
+      try {
+        // Import Supabase client
+        const { supabase } = await import("@/lib/supabase");
+        // Filter by createdby (faculty user id)
+        const { data, error } = await supabase
+          .from("quizzes")
+          .select("*")
+          .eq("createdby", user.id);
+        if (error) {
+          setQuizzes([]);
+        } else {
+          setQuizzes(data || []);
+        }
+      } catch (err) {
+        setQuizzes([]);
+      }
+      setQuizzesLoading(false);
+    }
+    if (user) fetchQuizzes();
+  }, [user]);
+
+  // Fetch quiz results for quizzes created by this faculty
+  useEffect(() => {
+    let channel: any = null;
+    async function fetchResultsAndSubscribe() {
+      if (!user) return;
+      setResultsLoading(true);
+      const { supabase } = await import("@/lib/supabase");
+      // Get all quiz codes created by this user
+      const { data: quizData } = await supabase
+        .from("quizzes")
+        .select("code")
+        .eq("createdby", user.id);
+      const quizCodes = (quizData || []).map((q: any) => q.code);
+      if (quizCodes.length === 0) {
+        setQuizResults([]);
+        setResultsLoading(false);
+        return;
+      }
+      // Fetch all results for these quizzes
+      const { data: resultsData } = await supabase
+        .from("quiz_results")
+        .select("*")
+        .in("quizcode", quizCodes);
+      setQuizResults(resultsData || []);
+      setResultsLoading(false);
+
+      // Real-time subscription for quiz_results
+      channel = supabase.channel('faculty-quiz-results')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'quiz_results',
+        }, (payload: any) => {
+          // Only update if the quizcode matches one of this faculty's quizzes
+          if (quizCodes.includes(payload.new.quizcode)) {
+            setQuizResults(prev => [...prev, payload.new]);
+          }
+        })
+        .subscribe();
+    }
+    fetchResultsAndSubscribe();
+    return () => {
+      if (channel) channel.unsubscribe();
+    };
+  }, [user]);
+
+  // Aggregate stats for dashboard, quiz studio, analytics
+  const analytics = useMemo(() => {
+    if (!quizResults || quizResults.length === 0) return {
+      totalSubmissions: 0,
+      avgScore: 0,
+      completionRate: 0,
+      recentActivities: [],
+      quizStats: {},
+    };
+    const totalSubmissions = quizResults.length;
+    const avgScore = Math.round(
+      quizResults.reduce((sum, r) => sum + (r.score || 0), 0) / (quizResults.length || 1)
+    );
+    // Completion rate: percent of quizzes with at least one submission
+    const quizCodes = Array.from(new Set(quizResults.map(r => r.quizcode)));
+    const completionRate = Math.round(
+      (quizCodes.length / (quizzes.length || 1)) * 100
+    );
+    // Recent activities: last 10 submissions
+    const recentActivities = quizResults
+      .sort((a, b) => new Date(b.submittedat).getTime() - new Date(a.submittedat).getTime())
+      .slice(0, 10)
+      .map(r => ({
+        type: "submission",
+        student: r.studentid,
+        quiz: r.quizcode,
+        score: r.score,
+        time: new Date(r.submittedat).toLocaleString(),
+        achievement: r.achievement || "", // Add achievement property (empty string if not present)
+        question: r.question || "", // Add question property (empty string if not present)
+      }));
+    // Quiz stats for quiz studio
+    const quizStats: Record<string, { submissions: number; avgScore: number; strongAreas: string[]; weakAreas: string[] }> = {};
+    quizCodes.forEach(code => {
+      const results = quizResults.filter(r => r.quizcode === code);
+      // Dummy strong/weak areas for demonstration; replace with real logic if available
+      const strongAreas: string[] = []; // e.g., results.filter(...).map(...)
+      const weakAreas: string[] = [];
+      quizStats[code] = {
+        submissions: results.length,
+        avgScore: Math.round(results.reduce((sum, r) => sum + (r.score || 0), 0) / (results.length || 1)),
+        strongAreas,
+        weakAreas,
+      };
+    });
+    return { totalSubmissions, avgScore, completionRate, recentActivities, quizStats };
+  }, [quizResults, quizzes]);
 
   useEffect(() => {
     if (loading) return;
@@ -266,7 +214,8 @@ export default function FacultyDashboard() {
               <span className="text-sm font-medium text-green-600">Optimal</span>
             </div>
             <span className="text-gray-600">
-              You have <span className="text-blue-600 font-medium">18 submissions</span> pending review and{" "}
+              You have{" "}
+              <span className="text-blue-600 font-medium">{analytics.totalSubmissions} submissions</span> pending review and{" "}
               <span className="text-green-600 font-medium">3 students</span> achieved perfect scores today.
             </span>
           </div>
@@ -334,7 +283,7 @@ export default function FacultyDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Quizzes</p>
-                <p className="text-3xl font-bold text-gray-900">67</p>
+                <p className="text-3xl font-bold text-gray-900">{quizzes.length}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="w-4 h-4 text-green-600" />
                   <span className="text-sm text-green-600">+15.2%</span>
@@ -450,64 +399,54 @@ export default function FacultyDashboard() {
               <CardDescription>Your latest quiz activities</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {sampleQuizzes.map((quiz) => (
-                <div key={quiz.id} className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
-                      <Badge
-                        variant={
-                          quiz.difficulty === "Easy"
-                            ? "secondary"
-                            : quiz.difficulty === "Medium"
-                              ? "default"
-                              : "destructive"
-                        }
-                      >
-                        {quiz.difficulty}
-                      </Badge>
-                      <Badge variant={quiz.status === "active" ? "default" : "secondary"}>{quiz.status}</Badge>
+              {quizzesLoading ? (
+                <div className="text-gray-500">Loading quizzes...</div>
+              ) : quizzes.length === 0 ? (
+                <div className="text-gray-500">No quizzes found.</div>
+              ) : (
+                quizzes.map((quiz) => (
+                  <div key={quiz.id || quiz.code} className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
+                        <Badge variant="outline">{quiz.subject}</Badge>
+                        <Badge variant={quiz.status === "active" ? "default" : "secondary"}>{quiz.status}</Badge>
+                        <Badge variant="secondary">Code: {quiz.code}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <BarChart3 className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Settings className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <BarChart3 className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Settings className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Students:</span>
-                      <span className="font-medium ml-1">{quiz.studentsEnrolled}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Submissions:</span>
-                      <span className="font-medium ml-1">{quiz.submissions}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Avg Score:</span>
-                      <span className="font-medium ml-1">{quiz.avgScore}%</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Questions:</span>
-                      <span className="font-medium ml-1">{quiz.questions}</span>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Questions:</span>
+                        <span className="font-medium ml-1">{quiz.questions?.length || 0}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Time Limit:</span>
+                        <span className="font-medium ml-1">{quiz.timeLimit} min</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Total Points:</span>
+                        <span className="font-medium ml-1">{quiz.totalPoints}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Created:</span>
+                        <span className="font-medium ml-1">{new Date(quiz.createdAt).toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Completion Rate</span>
-                      <span>{quiz.completionRate}%</span>
-                    </div>
-                    <Progress value={quiz.completionRate} className="h-2" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">Last activity: {quiz.lastActivity}</p>
-                </div>
-              ))}
+                ))
+              )}
+            
             </CardContent>
           </Card>
         </div>
@@ -522,7 +461,7 @@ export default function FacultyDashboard() {
               <CardDescription>Real-time student activities</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {recentActivities.map((activity, index) => (
+              {analytics.recentActivities.map((activity, index) => (
                 <div key={index} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50/50">
                   <div
                     className={`w-2 h-2 rounded-full mt-2 ${
@@ -584,61 +523,66 @@ export default function FacultyDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {sampleSections.map((section) => (
-          <Card key={section.id} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>{section.name}</CardTitle>
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
-                  {section.improvement}
-                </Badge>
-              </div>
-              <CardDescription>{section.students} students</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600">Avg Score</p>
-                  <p className="text-xl font-bold text-blue-600">{section.avgScore}%</p>
+        {Object.keys(analytics.quizStats).map((code) => {
+          const stat = analytics.quizStats[code];
+          return (
+            <Card key={code} className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{code}</CardTitle>
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {stat.submissions} submissions
+                  </Badge>
                 </div>
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-600">Completion</p>
-                  <p className="text-xl font-bold text-green-600">{section.completionRate}%</p>
+                <CardDescription>Avg Score: {stat.avgScore}%</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600">Completion</p>
+                    <p className="text-xl font-bold text-blue-600">{Math.round((stat.submissions / (quizzes.length || 1)) * 100)}%</p>
+                  </div>
+                  <div className="bg-green-50 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600">Engagement</p>
+                    <p className="text-xl font-bold text-green-600">{Math.round((stat.submissions / (analytics.totalSubmissions || 1)) * 100)}%</p>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span>Engagement Level</span>
-                  <span>{section.engagement}%</span>
-                </div>
-                <Progress value={section.engagement} className="h-2" />
-              </div>
+                {stat.strongAreas && stat.strongAreas.length > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span>Strong Areas</span>
+                      <span>{stat.strongAreas.length} topics</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {stat.strongAreas.map((area) => (
+                        <Badge key={area} variant="default" className="bg-green-100 text-green-800 text-xs">
+                          {area}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-              <div>
-                <p className="text-sm font-medium text-gray-900 mb-2">Strong Areas</p>
-                <div className="flex flex-wrap gap-1">
-                  {section.strongAreas.map((area) => (
-                    <Badge key={area} variant="default" className="bg-green-100 text-green-800 text-xs">
-                      {area}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-gray-900 mb-2">Weak Areas</p>
-                <div className="flex flex-wrap gap-1">
-                  {section.weakAreas.map((area) => (
-                    <Badge key={area} variant="outline" className="border-red-200 text-red-700 text-xs">
-                      {area}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                {stat.weakAreas && stat.weakAreas.length > 0 && (
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span>Weak Areas</span>
+                      <span>{stat.weakAreas.length} topics</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {stat.weakAreas.map((area) => (
+                        <Badge key={area} variant="outline" className="border-red-200 text-red-700 text-xs">
+                          {area}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Chart Placeholder */}
@@ -726,67 +670,72 @@ export default function FacultyDashboard() {
           <CardDescription>Manage your existing quizzes</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {sampleQuizzes.map((quiz) => (
-            <div key={quiz.id} className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
-                  <Badge variant="outline">{quiz.subject}</Badge>
-                  <Badge variant="outline">{quiz.category}</Badge>
-                  <Badge
-                    variant={
-                      quiz.difficulty === "Easy"
-                        ? "secondary"
-                        : quiz.difficulty === "Medium"
-                          ? "default"
-                          : "destructive"
-                    }
-                  >
-                    {quiz.difficulty}
-                  </Badge>
-                  <Badge variant={quiz.status === "active" ? "default" : "secondary"}>{quiz.status}</Badge>
+          {quizzesLoading ? (
+            <div className="text-gray-500">Loading quizzes...</div>
+          ) : quizzes.length === 0 ? (
+            <div className="text-gray-500">No quizzes found.</div>
+          ) : (
+            quizzes.map((quiz) => (
+              <div key={quiz.id || quiz.code} className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-gray-900">{quiz.title}</h3>
+                    <Badge variant="outline">{quiz.subject}</Badge>
+                    <Badge variant={quiz.status === "active" ? "default" : "secondary"}>{quiz.status}</Badge>
+                    <Badge variant="secondary">Code: {quiz.code}</Badge>
+                    <Badge variant="outline">{quiz.category}</Badge>
+                    <Badge
+                      variant={
+                        quiz.difficulty === "Easy"
+                          ? "secondary"
+                          : quiz.difficulty === "Medium"
+                            ? "default"
+                            : "destructive"
+                      }
+                    >
+                      {quiz.difficulty}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm">
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <BarChart3 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm">
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <BarChart3 className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    <Copy className="w-4 h-4" />
-                  </Button>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                  <div>
+                    <span className="text-gray-600">Students:</span>
+                    <span className="font-medium ml-1">{quiz.studentsEnrolled}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Submissions:</span>
+                    <span className="font-medium ml-1">{quiz.submissions}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Avg Score:</span>
+                    <span className="font-medium ml-1">{quiz.avgScore}%</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Questions:</span>
+                    <span className="font-medium ml-1">{quiz.questions?.length || 0}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Created: {new Date(quiz.createdAt).toLocaleDateString()}</span>
+                  <span>Last Activity: {quiz.lastActivity}</span>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
-                <div>
-                  <span className="text-gray-600">Students:</span>
-                  <span className="font-medium ml-1">{quiz.studentsEnrolled}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Submissions:</span>
-                  <span className="font-medium ml-1">{quiz.submissions}</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Avg Score:</span>
-                  <span className="font-medium ml-1">{quiz.avgScore}%</span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Questions:</span>
-                  <span className="font-medium ml-1">{quiz.questions}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Created: Jan 10, 2025</span>
-                <span>Due: Jan 20, 2025</span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
     </div>
@@ -843,62 +792,67 @@ export default function FacultyDashboard() {
           <CardDescription>Click on any student to view detailed performance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {sampleStudents.map((student) => (
-            <div
-              key={student.id}
-              className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors cursor-pointer"
-              onClick={() => setSelectedStudent(student)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <Avatar className="w-12 h-12">
-                      <AvatarFallback className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                        {student.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div
-                      className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                        student.online ? "bg-green-500" : "bg-gray-400"
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">{student.name}</h3>
-                      {student.badges.map((badge) => (
-                        <Badge key={badge} variant="secondary" className="text-xs">
-                          {badge}
-                        </Badge>
-                      ))}
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {student.section} • {student.department} • {student.year}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
+          {Object.keys(quizResults.reduce((acc, result) => {
+            acc[result.studentid] = acc[result.studentid] || { submissions: 0, score: 0, quizzes: new Set() };
+            acc[result.studentid].submissions += 1;
+            acc[result.studentid].score += result.score || 0;
+            acc[result.studentid].quizzes.add(result.quizcode);
+            return acc;
+          }, {})).map((studentId) => {
+            const studentResults = quizResults.filter(result => result.studentid === studentId);
+            const submissions = studentResults.length;
+            const avgScore = Math.round(studentResults.reduce((sum, r) => sum + (r.score || 0), 0) / submissions);
+            const quizzes = Array.from(new Set(studentResults.map(r => r.quizcode))).length;
+            // Fallbacks for missing student info
+            const name = studentResults[0]?.studentName || studentId;
+            return (
+              <div
+                key={studentId}
+                className="p-4 bg-gray-50/50 rounded-lg hover:bg-gray-100/50 transition-colors cursor-pointer"
+                onClick={() => setSelectedStudent({
+                  studentId,
+                  name,
+                  avgScore,
+                  submissions,
+                  quizzes,
+                })}
+              >
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div>
-                      <p className="text-lg font-bold text-gray-900">{student.avgScore}%</p>
-                      <p className="text-xs text-gray-600">Avg Score</p>
+                    <div className="relative">
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                          {name.slice(0,2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                     </div>
                     <div>
-                      <p className="text-lg font-bold text-gray-900">{student.completedQuizzes}</p>
-                      <p className="text-xs text-gray-600">Completed</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-green-600">{student.improvement}</span>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">{name}</h3>
                       </div>
-                      <p className="text-xs text-gray-600">Last active: {student.lastActive}</p>
+                      <p className="text-sm text-gray-600">ID: {studentId}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">{avgScore}%</p>
+                        <p className="text-xs text-gray-600">Avg Score</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">{submissions}</p>
+                        <p className="text-xs text-gray-600">Submissions</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">{quizzes}</p>
+                        <p className="text-xs text-gray-600">Quizzes Taken</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
     </div>
@@ -1154,7 +1108,7 @@ export default function FacultyDashboard() {
         <div className="p-4 border-b border-gray-200/50">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-blue-50/50 p-3 rounded-lg text-center">
-              <div className="text-xl font-bold text-blue-600">23</div>
+              <div className="text-xl font-bold text-blue-600">{quizzes.length}</div>
               <div className="text-xs text-gray-600">Active Quizzes</div>
             </div>
             <div className="bg-green-50/50 p-3 rounded-lg text-center">

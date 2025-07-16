@@ -27,23 +27,23 @@ export default function JoinQuizPage() {
 
     try {
       if (!quizCode.trim()) {
-        setError("Please enter a quiz code")
+        setError("Please enter a referral code.")
         setIsLoading(false)
         return
       }
       // Check if quiz code exists in Supabase
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from('quizzes')
-        .select('code')
-        .eq('code', quizCode.trim())
+        .select('*')
+        .eq('code', quizCode.trim().toUpperCase())
         .single();
-      if (!data || !data.code) {
-        setError("Invalid quiz code. Please check with your instructor.");
+      if (dbError || !data) {
+        setError("Quiz not found. Please check the code.");
         setIsLoading(false);
         return;
       }
       // Redirect to quiz taking page
-      router.push(`/quiz/take/${quizCode.trim()}`);
+      router.push(`/quiz/take/${quizCode.trim().toUpperCase()}`);
     } catch (error) {
       setError("Failed to join quiz. Please try again.")
     } finally {
@@ -58,70 +58,34 @@ export default function JoinQuizPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-2xl border-0">
-        <CardHeader className="text-center pb-4">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Join Quiz Session</CardTitle>
-          <CardDescription className="text-gray-600">Enter the quiz code provided by your instructor</CardDescription>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Join Quiz</CardTitle>
+          <CardDescription>Enter the referral code provided by your instructor.</CardDescription>
         </CardHeader>
-
         <CardContent className="space-y-6">
+          {error && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertDescription className="text-red-800">{error}</AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="quizCode">Quiz Code</Label>
-              <Input
-                id="quizCode"
-                type="text"
-                placeholder="Enter quiz code (e.g., MATH101)"
-                value={quizCode}
-                onChange={(e) => setQuizCode(e.target.value.toUpperCase())}
-                className="text-center text-lg font-mono tracking-wider"
-                disabled={isLoading}
-                maxLength={10}
-              />
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Joining Quiz...
-                </>
-              ) : (
-                <>
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  Join Quiz
-                </>
-              )}
+            <Input
+              placeholder="Enter referral code"
+              value={quizCode}
+              onChange={e => setQuizCode(e.target.value)}
+              disabled={isLoading}
+              className="text-lg"
+            />
+            <Button
+              type="submit"
+              disabled={isLoading || !quizCode.trim()}
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              {isLoading ? "Checking..." : "Join Quiz"}
             </Button>
           </form>
-
-          <div className="bg-blue-50 rounded-lg p-4">
-            <h3 className="font-medium text-blue-900 mb-2">Demo Quiz Codes:</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="bg-white rounded px-3 py-2 text-center font-mono">MATH101</div>
-              <div className="bg-white rounded px-3 py-2 text-center font-mono">PHYS201</div>
-              <div className="bg-white rounded px-3 py-2 text-center font-mono">CHEM301</div>
-              <div className="bg-white rounded px-3 py-2 text-center font-mono">BIO401</div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Button variant="ghost" onClick={() => router.push("/student/dashboard")}>
-              ← Back to Dashboard
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>
